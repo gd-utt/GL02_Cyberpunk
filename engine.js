@@ -1,7 +1,7 @@
 var engine = {
     check: function(){
         console.log("Engine Ready !");
-	console.log("Implementation de la certif magenta".magenta);
+	console.log("Magenta level checked".magenta);
         return true;
     }
 }
