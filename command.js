@@ -1,8 +1,8 @@
-var Command = {
+var command = {
 	check: function(){
-		console.log("Command Ready !")
-		return true
+		console.log("Command Ready !");
+		return true;
 		}
 	}
-module.exports = Command
+module.exports = command;
 
