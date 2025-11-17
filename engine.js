@@ -1,4 +1,4 @@
-var enginevar engine = {
+var engine = {
     check: function(){
         console.log("Command Ready !");
         return true;
