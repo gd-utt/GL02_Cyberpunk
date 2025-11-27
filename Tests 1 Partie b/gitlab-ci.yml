@@ -1,0 +1,421 @@
+
+---
+
+# 3) `sru-tool.js` (tout en un — fonctions exportées + CLI)
+Copie-colle **entier** ce fichier :
+
+```javascript
+#!/usr/bin/env node
+/**
+ * sru-tool.js
+ * CLI & module pour manipuler fichiers CRU (format fourni dans le cahier des charges)
+ *
+ * Implémente SPEC_01 → SPEC_08
+ */
+
+
+
+const fs = require('fs');
+const path = require('path');
+const { program } = require('commander');
+const { v4: uuidv4 } = require('uuid');
+
+/* ---------- Helpers (time parsing & utils) ---------- */
+
+function parseTime(hm) {
+  // hm: "HH:MM"
+  const [h, m] = hm.split(':').map(Number);
+  return { h, m, minutes: h * 60 + m };
+}
+
+function minutesToHHMM(mins) {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+const WEEK_DAYS = ['L', 'MA', 'ME', 'J', 'V'];
+const WORK_START = parseTime('08:00').minutes;
+const WORK_END = parseTime('20:00').minutes;
+
+/* ---------- Parseur CRU ----------
+   Expected lines:
+   +MATERIALECODE
+   1,TYPE,P=30,H=L H=08:00-10:00,SUBG,S001
+   (ABNF in cahier des charges)
+*/
+
+function parseCRU(filepath) {
+  const txt = fs.readFileSync(filepath, { encoding: 'utf8' });
+  const lines = txt.split(/\r?\n/);
+  const entries = [];
+  let currentMatiere = null;
+  for (let raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (line.startsWith('+')) {
+      currentMatiere = line.slice(1).trim();
+      continue;
+    }
+    if (line.startsWith('1,')) {
+      // split by comma but some fields may contain spaces
+      const parts = line.split(',').map(p => p.trim());
+      // Expect at least: "1", TYPE, "P=nn", "H=J HHHH-HHHH" or "H=J H=HH:MM-HH:MM" (spec is inconsistent)
+      if (parts.length < 6) continue;
+      const type = parts[1];
+      const capPart = parts[2];
+      const datePart = parts[3];
+      const sousgroupe = parts[4] || '';
+      const salle = parts[5] || '';
+      const capMatch = capPart.match(/P=(\d+)/i);
+      const cap = capMatch ? parseInt(capMatch[1], 10) : 0;
+      // datePart like "H=L H=08:00-10:00" or "H=L 08:00-10:00" or "H=MA H=09:00-11:00"
+      const dateMatch = datePart.match(/H=([A-Z]{1,2})\s*H?=?\s*([0-9]{2}:[0-9]{2})-([0-9]{2}:[0-9]{2})/i)
+                      || datePart.match(/H=([A-Z]{1,2})\s+([0-9]{2}:[0-9]{2})-([0-9]{2}:[0-9]{2})/i);
+      if (!dateMatch) continue;
+      const jour = dateMatch[1].toUpperCase();
+      const t1 = parseTime(dateMatch[2]);
+      const t2 = parseTime(dateMatch[3]);
+      const creneau = {
+        matiere: currentMatiere || 'UNKNOWN',
+        type,
+        capacitaire: cap,
+        jour,
+        heure_debut: t1.minutes,
+        heure_fin: t2.minutes,
+        sousgroupe,
+        salle
+      };
+      entries.push(creneau);
+    }
+  }
+  return entries;
+}
+
+/* ---------- SPEC implementations ---------- */
+
+// SPEC_01 — salles pour un cours (matiere contient code)
+function sallesForCourse(cruEntries, codeCours) {
+  const mapping = {};
+  for (const c of cruEntries) {
+    if (c.matiere.includes(codeCours)) {
+      mapping[c.salle] = mapping[c.salle] || new Set();
+      mapping[c.salle].add(`${c.jour} ${minutesToHHMM(c.heure_debut)}-${minutesToHHMM(c.heure_fin)}`);
+    }
+  }
+  const result = Object.keys(mapping).sort().map(s => ({ salle: s, horaires: Array.from(mapping[s]).sort() }));
+  return result;
+}
+
+// SPEC_02 — capacité max d'une salle
+function capacityOfRoom(cruEntries, room) {
+  let max = 0;
+  for (const c of cruEntries) {
+    if (c.salle === room && c.capacitaire > max) max = c.capacitaire;
+  }
+  return max;
+}
+
+// SPEC_03 — créneaux libres d'une salle (par jour)
+function freeSlotsForRoom(cruEntries, room) {
+  const occupied = {};
+  for (const d of WEEK_DAYS) occupied[d] = [];
+  for (const c of cruEntries) {
+    if (c.salle === room && WEEK_DAYS.includes(c.jour)) {
+      occupied[c.jour].push([c.heure_debut, c.heure_fin]);
+    }
+  }
+  const free = {};
+  for (const d of WEEK_DAYS) {
+    const intervals = occupied[d].sort((a,b) => a[0] - b[0]);
+    let cursor = WORK_START;
+    const frees = [];
+    for (const [a,b] of intervals) {
+      if (b <= cursor) continue;
+      if (a > cursor) frees.push([cursor, a]);
+      cursor = Math.max(cursor, b);
+    }
+    if (cursor < WORK_END) frees.push([cursor, WORK_END]);
+    free[d] = frees.map(([s,e]) => `${minutesToHHMM(s)}-${minutesToHHMM(e)}`);
+  }
+  return free;
+}
+
+// SPEC_04 — salles disponibles pour un créneau donné
+function roomsAvailableForCreneau(cruEntries, creneauQuery) {
+  // expected: "L H=09:00-11:00" or "L 09:00-11:00"
+  const m = creneauQuery.match(/([A-Z]{1,2})\s*H?=?\s*([0-9]{2}:[0-9]{2})-([0-9]{2}:[0-9]{2})/i);
+  if (!m) throw new Error('Format invalide. Ex: "L H=09:00-11:00"');
+  const jour = m[1].toUpperCase();
+  const qStart = parseTime(m[2]).minutes;
+  const qEnd = parseTime(m[3]).minutes;
+  const rooms = new Set(cruEntries.map(c => c.salle));
+  const res = [];
+  for (const room of Array.from(rooms).sort()) {
+    let overlaps = false;
+    for (const c of cruEntries) {
+      if (c.salle !== room || c.jour !== jour) continue;
+      // overlap if not (qEnd <= a or qStart >= b)
+      if (!(qEnd <= c.heure_debut || qStart >= c.heure_fin)) {
+        overlaps = true;
+        break;
+      }
+    }
+    if (!overlaps) res.push(room);
+  }
+  return res;
+}
+
+// SPEC_05 — vérification chevauchements
+function verifyNoOverlap(cruEntries) {
+  const violations = [];
+  // group by (salle, jour)
+  const map = {};
+  for (const c of cruEntries) {
+    const key = `${c.salle}||${c.jour}`;
+    map[key] = map[key] || [];
+    map[key].push(c);
+  }
+  for (const key of Object.keys(map)) {
+    const list = map[key].sort((a,b) => a.heure_debut - b.heure_debut);
+    for (let i=0;i<list.length;i++){
+      for (let j=i+1;j<list.length;j++){
+        const a = list[i], b = list[j];
+        if (!(a.heure_fin <= b.heure_debut || a.heure_debut >= b.heure_fin)) {
+          violations.push({ salle: a.salle, jour: a.jour, a, b });
+        }
+      }
+    }
+  }
+  return violations;
+}
+
+// SPEC_06 — générer .ics RFC5545 minimal
+function generateICal(cruEntries, codeCours, dateStart, dateEnd, outDir = 'data') {
+  const events = cruEntries.filter(c => c.matiere.includes(codeCours));
+  if (!events.length) throw new Error('Aucun créneau pour ce cours');
+  const ds = new Date(dateStart + 'T00:00:00');
+  const de = new Date(dateEnd + 'T23:59:59');
+  if (Number.isNaN(ds.getTime()) || Number.isNaN(de.getTime())) throw new Error('Dates invalides; format YYYY-MM-DD');
+  if (ds > de) throw new Error('Date début doit être <= date fin');
+  const mapWD = { 'L':1,'MA':2,'ME':3,'J':4,'V':5 }; // JS: Mon=1... (we will use getDay() Mon=1? getDay: Sun=0)
+  // But getDay(): Sunday=0, Monday=1 ... Friday=5
+  const lines = [];
+  lines.push('BEGIN:VCALENDAR');
+  lines.push('VERSION:2.0');
+  lines.push('PRODID:-//SRU-Tool//EN');
+  for (const ev of events) {
+    // for each date in range with same weekday
+    let cur = new Date(ds);
+    while (cur <= de) {
+      const wk = cur.getDay(); // Sun=0,Mon=1,...Fri=5
+      const target = (ev.jour === 'L' && wk === 1) || (ev.jour === 'MA' && wk === 2) ||
+                     (ev.jour === 'ME' && wk === 3) || (ev.jour === 'J' && wk === 4) ||
+                     (ev.jour === 'V' && wk === 5);
+      if (target) {
+        // build DTSTART / DTEND in local time (naive)
+        const start = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate(), Math.floor(ev.heure_debut/60), ev.heure_debut%60, 0);
+        const end = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate(), Math.floor(ev.heure_fin/60), ev.heure_fin%60, 0);
+        lines.push('BEGIN:VEVENT');
+        lines.push(`UID:${uuidv4()}`);
+        lines.push(`DTSTAMP:${toUTCStamp(new Date())}`);
+        lines.push(`DTSTART:${toLocalStamp(start)}`);
+        lines.push(`DTEND:${toLocalStamp(end)}`);
+        lines.push(`SUMMARY:${ev.matiere} (${ev.salle})`);
+        lines.push('END:VEVENT');
+      }
+      cur.setDate(cur.getDate() + 1);
+    }
+  }
+  lines.push('END:VCALENDAR');
+  if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+  const outPath = path.join(outDir, `${codeCours}_${dateStart}_${dateEnd}.ics`);
+  fs.writeFileSync(outPath, lines.join('\r\n'), { encoding: 'utf8' });
+  return outPath;
+}
+
+function toUTCStamp(d) {
+  // YYYYMMDDTHHMMSSZ
+  return d.toISOString().replace(/[-:]/g,'').split('.')[0] + 'Z';
+}
+function toLocalStamp(d) {
+  // naive local stamp without Z: YYYYMMDDTHHMMSS
+  const YYYY = d.getFullYear();
+  const MM = String(d.getMonth()+1).padStart(2,'0');
+  const DD = String(d.getDate()).padStart(2,'0');
+  const hh = String(d.getHours()).padStart(2,'0');
+  const mm = String(d.getMinutes()).padStart(2,'0');
+  const ss = String(d.getSeconds()).padStart(2,'0');
+  return `${YYYY}${MM}${DD}T${hh}${mm}${ss}`;
+}
+
+// SPEC_07 — génération CSV taux d'occupation
+function generateOccupationCSV(cruEntries, outDir = 'data') {
+  const totalPossible = (WORK_END - WORK_START) * WEEK_DAYS.length;
+  const byRoom = {};
+  for (const c of cruEntries) {
+    const dur = Math.max(0, c.heure_fin - c.heure_debut);
+    byRoom[c.salle] = (byRoom[c.salle] || 0) + dur;
+  }
+  if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+  const outPath = path.join(outDir, 'occupation.csv');
+  const header = 'salle,minutes_occupied,minutes_possible,occupancy_percent';
+  const rows = [header];
+  for (const salle of Object.keys(byRoom).sort()) {
+    const occ = byRoom[salle];
+    const pct = totalPossible > 0 ? ((occ / totalPossible) * 100).toFixed(2) : '0.00';
+    rows.push(`${salle},${occ},${totalPossible},${pct}`);
+  }
+  fs.writeFileSync(outPath, rows.join('\n'), { encoding: 'utf8' });
+  return outPath;
+}
+
+// SPEC_08 — classement par capacité
+function rankByCapacity(cruEntries) {
+  const caps = {};
+  for (const c of cruEntries) {
+    caps[c.salle] = Math.max(caps[c.salle] || 0, c.capacitaire || 0);
+  }
+  return Object.entries(caps).sort((a,b) => b[1] - a[1]).map(([salle, cap]) => ({ salle, cap }));
+}
+
+/* ---------- Exports for tests + CLI ---------- */
+module.exports = {
+  parseCRU,
+  sallesForCourse,
+  capacityOfRoom,
+  freeSlotsForRoom,
+  roomsAvailableForCreneau,
+  verifyNoOverlap,
+  generateICal,
+  generateOccupationCSV,
+  rankByCapacity
+};
+
+/* ---------- CLI (commander) ---------- */
+if (require.main === module) {
+  program
+    .name('sru-tool')
+    .description('CLI SRU-Tool — gestion des salles (CRU)')
+    .argument('<cruFile>', 'fichier CRU (ex: emploi.cru)')
+    .option('--cours <code>', 'Rechercher salles d\'un cours')
+    .option('-c, --capaciteMax <salle>', 'Capacité maximale d\'une salle')
+    .option('-s, --salle <salle>', 'Afficher créneaux libres d\'une salle')
+    .option('--salleCreneau <creneau>', 'Afficher salles libres pour créneau donné (ex: "L H=09:00-11:00")')
+    .option('-v, --verif', 'Vérifier chevauchements')
+    .option('--ical <code> <dateStart> <dateEnd>', 'Générer .ics: CODE DATE_DEBUT(YYYY-MM-DD) DATE_FIN')
+    .option('-g, --genererSynthetique', 'Générer CSV taux d\'occupation')
+    .option('--rank-capacity', 'Classer salles par capacité')
+    .parse(process.argv);
+
+  const opts = program.opts();
+  const cruFile = program.args[0];
+  if (!fs.existsSync(cruFile)) {
+    console.error('Fichier CRU introuvable:', cruFile);
+    process.exit(2);
+  }
+  const cru = parseCRU(cruFile);
+
+  if (opts.cours) {
+    const res = sallesForCourse(cru, opts.cours);
+    if (!res.length) {
+      console.log(`Aucune salle trouvée pour ${opts.cours}`);
+      process.exit(1);
+    }
+    console.log(`Salles pour ${opts.cours}:`);
+    for (const r of res) {
+      console.log(` - ${r.salle}:`);
+      for (const h of r.horaires) console.log(`    ${h}`);
+    }
+    process.exit(0);
+  }
+
+  if (opts.capaciteMax) {
+    const c = capacityOfRoom(cru, opts.capaciteMax);
+    if (!c) {
+      console.log(`Aucune capacité trouvée pour ${opts.capaciteMax}`);
+      process.exit(1);
+    }
+    console.log(`Capacité maximale pour ${opts.capaciteMax}: ${c}`);
+    process.exit(0);
+  }
+
+  if (opts.salle) {
+    const free = freeSlotsForRoom(cru, opts.salle);
+    console.log(`Créneaux libres pour ${opts.salle} (plage ${minutesToHHMM(WORK_START)}-${minutesToHHMM(WORK_END)}):`);
+    for (const d of WEEK_DAYS) {
+      const slots = free[d];
+      console.log(` ${d}: ${slots.length ? slots.join(', ') : '(aucun créneau libre)'}`);
+    }
+    process.exit(0);
+  }
+
+  if (opts.salleCreneau) {
+    try {
+      const rooms = roomsAvailableForCreneau(cru, opts.salleCreneau);
+      if (!rooms.length) {
+        console.log('Aucune salle disponible pour ce créneau.');
+        process.exit(1);
+      }
+      console.log('Salles disponibles pour', opts.salleCreneau);
+      for (const r of rooms) console.log(' -', r);
+      process.exit(0);
+    } catch (e) {
+      console.error('Erreur:', e.message);
+      process.exit(2);
+    }
+  }
+
+  if (opts.verif) {
+    const viol = verifyNoOverlap(cru);
+    if (!viol.length) {
+      console.log('Aucune anomalie de chevauchement détectée.');
+      process.exit(0);
+    }
+    console.log('Chevauchements détectés:');
+    for (const v of viol) {
+      console.log(`- Salle ${v.salle} le ${v.jour}: ${v.a.matiere} ${minutesToHHMM(v.a.heure_debut)}-${minutesToHHMM(v.a.heure_fin)} <-> ${v.b.matiere} ${minutesToHHMM(v.b.heure_debut)}-${minutesToHHMM(v.b.heure_fin)}`);
+    }
+    process.exit(1);
+  }
+
+  if (opts.ical) {
+    // commander sets opts.ical to first arg only if used like --ical CODE DATE DATE file; we use raw argv fallback
+    const raw = program.args.slice(1); // after cruFile
+    // Accept both: node sru-tool.js --ical CODE START END file  OR node sru-tool.js file --ical CODE START END
+    let code, ds, de;
+    // find index of --ical in process.argv
+    const idx = process.argv.findIndex(a => a === '--ical');
+    if (idx >= 0 && process.argv.length > idx + 3) {
+      code = process.argv[idx+1];
+      ds = process.argv[idx+2];
+      de = process.argv[idx+3];
+    } else {
+      console.error('Usage: --ical CODE DATE_DEBUT DATE_FIN');
+      process.exit(2);
+    }
+    try {
+      const out = generateICal(cru, code, ds, de);
+      console.log('ICS généré:', out);
+      process.exit(0);
+    } catch (e) {
+      console.error('Erreur:', e.message);
+      process.exit(2);
+    }
+  }
+
+  if (opts.genererSynthetique) {
+    const out = generateOccupationCSV(cru);
+    console.log('CSV généré:', out);
+    process.exit(0);
+  }
+
+  if (opts.rankCapacity || opts['rank-capacity']) {
+    const out = rankByCapacity(cru);
+    console.log('Classement des salles par capacité (desc):');
+    for (const r of out) console.log(` - ${r.salle}: ${r.cap}`);
+    process.exit(0);
+  }
+
+  program.help();
+}

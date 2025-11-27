@@ -1,0 +1,26 @@
+{
+  "name": "sru-tool",
+  "version": "1.0.0",
+  "description": "CLI SRU-Tool  gestion des salles (CRU) (Node.js)",
+  "main": "sru-tool.js",
+  "bin": {
+    "sru-tool": "./sru-tool.js"
+  },
+  "scripts": {
+    "start": "node sru-tool.js",
+    "test": "jest --runInBand",
+    "lint": "eslint . --ext .js"
+  },
+  "author": "Ton équipe",
+  "license": "MIT",
+  "devDependencies": {
+    "eslint": "^8.0.0",
+    "jest": "^29.0.0"
+  },
+  "dependencies": {
+    "commander": "^11.0.0"
+  },
+  "engines": {
+    "node": ">=16"
+  }
+}
