@@ -4,7 +4,7 @@
   "description": "CLI SRU-Tool  gestion des salles (CRU) (Node.js)",
   "main": "sru-tool.js",
   "bin": {
-    "sru-tool": "./sru-tool.js"
+    "sru-tool": "sru-tool.js"
   },
   "scripts": {
     "start": "node sru-tool.js",
@@ -18,9 +18,11 @@
     "jest": "^29.0.0"
   },
   "dependencies": {
-    "commander": "^11.0.0"
+    "commander": "^11.1.0"
   },
   "engines": {
     "node": ">=16"
-  }
+  },
+  "keywords": [],
+  "type": "commonjs"
 }
