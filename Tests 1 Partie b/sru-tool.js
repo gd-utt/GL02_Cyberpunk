@@ -82,6 +82,11 @@ function classeur(table){
     });
 }
 
+/* ------------------ CHIFFREUR ------------------ */
+function toNumber(horaire) {
+            return parseInt(horaire.replace(/\D/g, ""));
+        }
+
 /* ------------------ EXECUTION ------------------ */
 
 const data = parseCRU(cruFile);
@@ -107,10 +112,6 @@ if (options.cours) {
     
 }
 
-<<<<<<< HEAD
-=======
-
->>>>>>> 9bbf10ff62e98b611a44f20d200fc0272e2d9dac
 if (options.capaciteMax) {
     //PUTAIN expliquez moi pourquoi une salle a des capacites differentes
     result = result.filter(e => e.salle.toUpperCase() === options.capaciteMax.toUpperCase());
@@ -147,11 +148,6 @@ if (options.salleCreneau) {
     }
     else {
         const creneau = options.salleCreneau.split("/");
-
-
-        function toNumber(horaire) {
-            return parseInt(horaire.replace(/\D/g, ""));
-        }
 
         if (toNumber(creneau[1]) >= toNumber(creneau[2])){
             console.log("Horaires invalides");
@@ -212,15 +208,52 @@ if (options.salleCreneau) {
         }
     }
 }
-<<<<<<< HEAD
-
+*/
     if(options.verif){
-        
+        classeur(result);
+        let i = 0;
+        let conflictCount =0;
+        for(let e of result){
+            if(toNumber(e.h1) >= toNumber(e.h2)){
+                conflictCount++;
+                console.log(`Horaire invalide pour ${mat2} le ${e.jour}`);
+            }
+            for(let j = 0; j < result.length; j++){
+                if(i <= j){
+                    continue;
+                }
+                if(e.jour == result[j].jour){
+                    if(e.salle === result[j].salle){
+                        if((toNumber(e.h1) >= toNumber(result[j].h1)) && (toNumber(e.h1) < toNumber(result[j].h2)) && (toNumber(e.h2) <= toNumber(result[j].h2) || toNumber(e.h2) >= toNumber(result[j].h2) ) ){
+                            conflictCount++;
+                            let mat1;
+                            let mat2;
+                            if(e.matiere.toUpperCase() == "LIBRE"){
+                                mat1 = "'Horaire libre'";
+                            }else{
+                                mat1 = e.matiere;
+                            }
+                            if(result[j].matiere.toUpperCase() == "LIBRE"){
+                                mat2 = "'Horaire libre'";
+                            }else{
+                                mat2 = result[j].matiere;
+                            }
+                            console.log(`Conflict de programme entre ${mat1}(${e.type}) et ${mat2}(${result[j].type}) le ${e.jour} ${e.h1}-${e.h2} `);
+                        }
+                    }
+                }else{
+                    break;
+                }
+            }
+            i++;
+        }
+        if(conflictCount == 0){
+                console.log("Le fichier est correct");
+        }else{
+                console.log("Nombre total de conflict rencontre : " + conflictCount);
+        }
     }
 
-=======
-*/
->>>>>>> 9bbf10ff62e98b611a44f20d200fc0272e2d9dac
 process.exit(0);
 
 
