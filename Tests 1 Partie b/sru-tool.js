@@ -6,10 +6,10 @@ const { program } = require("commander");
 program
     .argument("<file>", "fichier .cru")
     .option("--cours <type>", "Affiche la salle associe a un cours (CM, TD, TP)")
-    .option("--matiere <nomMatiere>", "filtrer par matière (GL02, GL03...)")
     .option("-s ,--salle <salle>", "Affiche les dates pour lesquelles une salle est libre ")
     .option("-sc ,--salleCreneau <creneau>", "Affiche les salle qui sont libres a un creneau donne (jour/HeureDebut/HeureFin) Format heure xx:xx")
     .option("-c, --capaciteMax <salle>", "Affiche la capacite maximale d'une salle donnee")
+    .option("-v, --verif", "Verifie si le cru est coherent dans les planning")
     .parse(process.argv);
 
 const options = program.opts();
@@ -107,22 +107,8 @@ if (options.cours) {
     
 }
 
-/*if (options.matiere) {
-    result = result.filter(e => e.matiere.toUpperCase() === options.matiere.toUpperCase());
-    if (result.length === 0) {
-        console.log("Aucun elements trouvé selon les critères.");
-        process.exit(0);
-    }else{
-        console.log(`Les matieres donnant des ${options.cours.toUpperCase()} sont : `);
-        for (let e of result) {
-            console.log(
-                ` ${e.matiere} | ${e.jour} ${e.h1}-${e.h2} | Salle ${e.salle} | Cap=${e.capacitaire}`
-            );
-        }
-    }
-}*/
-
 if (options.capaciteMax) {
+    //PUTAIN expliquez moi pourquoi une salle a des capacites differentes
     result = result.filter(e => e.salle.toUpperCase() === options.capaciteMax.toUpperCase());
     if (result.length === 0) {
         console.log("La salle n'a pas ete trouvee ");
@@ -180,6 +166,10 @@ if (options.salleCreneau){
         }
     }
 }
+
+    if(options.verif){
+        
+    }
 
 process.exit(0);
 
