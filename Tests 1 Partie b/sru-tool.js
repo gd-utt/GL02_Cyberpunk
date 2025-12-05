@@ -243,7 +243,7 @@ if (options.salleCreneau) {
                     }
                 }else{
                     break;
-                }
+                } 
             }
             i++;
         }
