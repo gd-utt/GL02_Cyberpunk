@@ -6,7 +6,6 @@ const { program } = require("commander");
 program
     .argument("<file>", "fichier .cru")
     .option("--cours <type>", "Affiche la salle associe a un cours (CM, TD, TP)")
-    .option("--matiere <nomMatiere>", "filtrer par matière (GL02, GL03...)")
     .option("-s ,--salle <salle>", "Affiche les dates pour lesquelles une salle est libre ")
     .option("-sc ,--salleCreneau <creneau>", "Affiche les salle qui sont libres a un creneau donne (jour/HeureDebut/HeureFin) Format heure xx:xx")
     .option("-c, --capaciteMax <salle>", "Affiche la capacite maximale d'une salle donnee")
@@ -97,7 +96,7 @@ if (options.cours) {
     }else{
         console.log(`Les salles occupees par un ${options.cours.toUpperCase()} sont : `);
         //classe les salles selon le jour 
-        classeur(result);
+       classeur(result);
         for (let e of result) {
             console.log(
                 ` Salle ${e.salle} | ${e.jour} ${e.h1}-${e.h2} | ${e.matiere}`
@@ -107,20 +106,6 @@ if (options.cours) {
     
 }
 
-/*if (options.matiere) {
-    result = result.filter(e => e.matiere.toUpperCase() === options.matiere.toUpperCase());
-    if (result.length === 0) {
-        console.log("Aucun elements trouvé selon les critères.");
-        process.exit(0);
-    }else{
-        console.log(`Les matieres donnant des ${options.cours.toUpperCase()} sont : `);
-        for (let e of result) {
-            console.log(
-                ` ${e.matiere} | ${e.jour} ${e.h1}-${e.h2} | Salle ${e.salle} | Cap=${e.capacitaire}`
-            );
-        }
-    }
-}*/
 
 if (options.capaciteMax) {
     result = result.filter(e => e.salle.toUpperCase() === options.capaciteMax.toUpperCase());
@@ -145,13 +130,50 @@ if (options.salle){
         console.log(`La salle ${options.salle.toUpperCase()} est libre aux horaires suivants :  `);
         for (let e of result) {
             console.log(
-                ` ${e.jour} ${e.h1}-${e.h2} | Cap=${e.capacitaire}`
+                ` ${e.jour} ${e.h1}-${e.h2} | Capacité=${e.capacitaire}`
             );
         }
     }
 }
+if (options.salleCreneau) {
+    result = result.filter(e => (e.matiere.toUpperCase() === "LIBRE"));
+    if (result.length === 0) {
+        console.log("Aucune salle n'est libre");
+    }
+    else {
+        const creneau = options.salleCreneau.split("/");
 
-if (options.salleCreneau){
+
+        function toNumber(horaire) {
+            return parseInt(horaire.replace(/\D/g, ""));
+        }
+
+        if (toNumber(creneau[1]) >= toNumber(creneau[2])){
+            console.log("Horaires invalides");
+            process.exit(0);
+        }
+
+        const try1 = result.filter(e => (toNumber(e.h1) <= toNumber(creneau[1]) && toNumber(e.h2) >= toNumber(creneau[2])));
+        if (try1.length === 0) {
+            console.log("Aucune salle n'est libre");
+        } else {
+            console.log("Les salles libres sont : ");
+            for (let e of try1) {
+                console.log(
+                    `${e.salle} | ${e.jour} ${e.h1}-${e.h2} | Cap=${e.capacitaire}`
+                );
+            }
+        }
+    }
+}
+
+
+
+
+
+
+
+    /*if (options.salleCreneau){
     result = result.filter(e => (e.matiere.toUpperCase() === "LIBRE"));
     if(result.length === 0){
          console.log("Aucune salle n'est libre");
@@ -159,10 +181,15 @@ if (options.salleCreneau){
         const creneau = options.salleCreneau.split("/");
         const try1 = result.filter(e => (e.h1 === "H="+creneau[1] && e.h2 === creneau[2] && e.jour === creneau[0]));
         if(try1.length === 0){
-            const try2 = result.filter(e => (e.h1 === "H="+creneau[1]));;
-            if(try2.length === 0){
+            const try2 = result.filter(e => (e.h1 === "H="+creneau[1]));
+            const try3 = result.filter(e => (e.h2 === "H="+creneau[2]));
+
+            if(try2.length === 0 && try3.length === 0) {
                 console.log("Le creneau donnee n'a aucune corexpondance");
-            }else{
+            }
+            else if (try3.length === 0 && try2.length !== 0){
+
+            } else{
                 console.log("Le creneau n'a pas correspondance mais des horaires sont utilisables");
                 for (let e of try2) {
                     console.log(
@@ -180,7 +207,7 @@ if (options.salleCreneau){
         }
     }
 }
-
+*/
 process.exit(0);
 
 
