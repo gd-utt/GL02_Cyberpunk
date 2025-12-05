@@ -97,7 +97,7 @@ if (options.cours) {
     }else{
         console.log(`Les salles occupees par un ${options.cours.toUpperCase()} sont : `);
         //classe les salles selon le jour 
-        classeur(result);
+       classeur(result);
         for (let e of result) {
             console.log(
                 ` Salle ${e.salle} | ${e.jour} ${e.h1}-${e.h2} | ${e.matiere}`
@@ -107,6 +107,10 @@ if (options.cours) {
     
 }
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 9bbf10ff62e98b611a44f20d200fc0272e2d9dac
 if (options.capaciteMax) {
     //PUTAIN expliquez moi pourquoi une salle a des capacites differentes
     result = result.filter(e => e.salle.toUpperCase() === options.capaciteMax.toUpperCase());
@@ -131,13 +135,50 @@ if (options.salle){
         console.log(`La salle ${options.salle.toUpperCase()} est libre aux horaires suivants :  `);
         for (let e of result) {
             console.log(
-                ` ${e.jour} ${e.h1}-${e.h2} | Cap=${e.capacitaire}`
+                ` ${e.jour} ${e.h1}-${e.h2} | Capacité=${e.capacitaire}`
             );
         }
     }
 }
+if (options.salleCreneau) {
+    result = result.filter(e => (e.matiere.toUpperCase() === "LIBRE"));
+    if (result.length === 0) {
+        console.log("Aucune salle n'est libre");
+    }
+    else {
+        const creneau = options.salleCreneau.split("/");
 
-if (options.salleCreneau){
+
+        function toNumber(horaire) {
+            return parseInt(horaire.replace(/\D/g, ""));
+        }
+
+        if (toNumber(creneau[1]) >= toNumber(creneau[2])){
+            console.log("Horaires invalides");
+            process.exit(0);
+        }
+
+        const try1 = result.filter(e => (toNumber(e.h1) <= toNumber(creneau[1]) && toNumber(e.h2) >= toNumber(creneau[2])));
+        if (try1.length === 0) {
+            console.log("Aucune salle n'est libre");
+        } else {
+            console.log("Les salles libres sont : ");
+            for (let e of try1) {
+                console.log(
+                    `${e.salle} | ${e.jour} ${e.h1}-${e.h2} | Cap=${e.capacitaire}`
+                );
+            }
+        }
+    }
+}
+
+
+
+
+
+
+
+    /*if (options.salleCreneau){
     result = result.filter(e => (e.matiere.toUpperCase() === "LIBRE"));
     if(result.length === 0){
          console.log("Aucune salle n'est libre");
@@ -145,10 +186,15 @@ if (options.salleCreneau){
         const creneau = options.salleCreneau.split("/");
         const try1 = result.filter(e => (e.h1 === "H="+creneau[1] && e.h2 === creneau[2] && e.jour === creneau[0]));
         if(try1.length === 0){
-            const try2 = result.filter(e => (e.h1 === "H="+creneau[1]));;
-            if(try2.length === 0){
+            const try2 = result.filter(e => (e.h1 === "H="+creneau[1]));
+            const try3 = result.filter(e => (e.h2 === "H="+creneau[2]));
+
+            if(try2.length === 0 && try3.length === 0) {
                 console.log("Le creneau donnee n'a aucune corexpondance");
-            }else{
+            }
+            else if (try3.length === 0 && try2.length !== 0){
+
+            } else{
                 console.log("Le creneau n'a pas correspondance mais des horaires sont utilisables");
                 for (let e of try2) {
                     console.log(
@@ -166,11 +212,15 @@ if (options.salleCreneau){
         }
     }
 }
+<<<<<<< HEAD
 
     if(options.verif){
         
     }
 
+=======
+*/
+>>>>>>> 9bbf10ff62e98b611a44f20d200fc0272e2d9dac
 process.exit(0);
 
 
