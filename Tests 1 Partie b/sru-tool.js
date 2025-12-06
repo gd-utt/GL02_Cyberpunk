@@ -168,6 +168,7 @@ if (options.salle){
         }
     }
 }
+
 if (options.salleCreneau) {
     result = result.filter(e => (e.matiere.toUpperCase() === "LIBRE"));
     if (result.length === 0) {
@@ -181,7 +182,7 @@ if (options.salleCreneau) {
             process.exit(0);
         }
 
-        const try1 = result.filter(e => (toNumber(e.h1) <= toNumber(creneau[1]) && toNumber(e.h2) >= toNumber(creneau[2])));
+        const try1 = result.filter(e => (toNumber(e.h1) <= toNumber(creneau[1]) && toNumber(e.h2) >= toNumber(creneau[2]) && creneau[0].toUpperCase() === e.jour.toUpperCase()));
         if (try1.length === 0) {
             console.log("Aucune salle n'est libre");
         } else {
