@@ -18,7 +18,10 @@
     "jest": "^29.0.0"
   },
   "dependencies": {
-    "commander": "^11.1.0"
+    "canvas": "^3.2.0",
+    "commander": "^11.1.0",
+    "vega": "^6.2.0",
+    "vega-lite": "^6.4.1"
   },
   "engines": {
     "node": ">=16"

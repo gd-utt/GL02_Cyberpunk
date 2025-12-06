@@ -2,6 +2,9 @@
 
 const fs = require("fs");
 const { program } = require("commander");
+//const vega = require("vega");
+//const vegaLite = require("vega-lite");
+const { url } = require("inspector");
 
 program
     .argument("<file>", "fichier .cru")
@@ -10,6 +13,8 @@ program
     .option("-sc ,--salleCreneau <creneau>", "Affiche les salle qui sont libres a un creneau donne (jour/HeureDebut/HeureFin) Format heure xx:xx")
     .option("-c, --capaciteMax <salle>", "Affiche la capacite maximale d'une salle donnee")
     .option("-v, --verif", "Verifie si le cru est coherent dans les planning")
+    .option("-g, --genererSynthetic", "Donne un visuel synthetic de l'usage de chaque classe")
+    .option("-cl, --classement", "Classe les salles selon leur capacite maximale")
     .parse(process.argv);
 
 const options = program.opts();
@@ -87,6 +92,28 @@ function toNumber(horaire) {
             return parseInt(horaire.replace(/\D/g, ""));
         }
 
+/* ------------------ TRANSFORMERS ------------------ */
+function optimusPrime(table, enTete){
+    enTete.join(',');
+    const lignes = table.map(s => {
+        return s.join(',');
+    });
+    return [enTete, ...lignes].join('\n');
+}
+
+/* ------------------ PHOTOSHOP ------------------ */
+async function Vegashop(vegaprint, cheminFichePng) {
+    const { compile } = await import("vega-lite"); 
+    const { View, parse } = await import("vega"); 
+    const vegaSpec = compile(vegaprint).spec;
+    const view = new View(parse(vegaSpec), { 
+        renderer: "canvas" 
+    }).finalize();
+    const canvas = await view.toCanvas();
+    const buffer = canvas.toBuffer("image/png");
+    fs.writeFileSync(cheminFichePng, buffer);
+}
+
 /* ------------------ EXECUTION ------------------ */
 
 const data = parseCRU(cruFile);
@@ -113,7 +140,7 @@ if (options.cours) {
 }
 
 if (options.capaciteMax) {
-    //PUTAIN expliquez moi pourquoi une salle a des capacites differentes
+    //expliquez moi pourquoi une salle a des capacites differentes
     result = result.filter(e => e.salle.toUpperCase() === options.capaciteMax.toUpperCase());
     if (result.length === 0) {
         console.log("La salle n'a pas ete trouvee ");
@@ -254,6 +281,56 @@ if (options.salleCreneau) {
         }
     }
 
-process.exit(0);
+    if(options.genererSynthetic){
+        const nbr = result.length;
+        const salleUseCount = result.reduce((acc, cur) =>{
+            const salle = cur.salle;
+            acc.set(salle, (acc.get(salle) || 0)+1);
+            return acc;
+        }, new Map());
+        const salleUseTaux = new Map();
+        for([salle, count] of salleUseCount){
+            const taux = (count/nbr)*100;
+            salleUseTaux.set(salle, taux.toFixed(2));
+        }
+        const enTete = ["Salle", "Taux"];
+        const contenuCSV = optimusPrime(Array.from(salleUseTaux),enTete);
+        const instant = new Date();
+        const cheminFicheCSV = `./fiche_synthetic_${instant.getMonth() + 1}_${instant.getFullYear()}.csv`;
+        fs.writeFileSync(cheminFicheCSV, contenuCSV, "utf8");
+        const vegaprint ={
+            $schema: "https://vega.github.io/schema/vega-lite/v5.json",
+            description: "Usage des salles",
+            data: { url: cheminFicheCSV },
+            mark: "bar",
+            encoding: {
+                y: {field:"Salle", type:"nominal"},
+                x: {field:"Taux", type:"quantitative"},
+                color: {field:"Salle", type:"nominal"}
+            }
+        };
+        const cheminFichePng = `./fiche_synthetic_${instant.getMonth() + 1}_${instant.getFullYear()}.png`;
+        Vegashop(vegaprint, cheminFichePng);
+        console.log(`Fiche synthetic generee : ${cheminFicheCSV}`);
+    }
+
+    if(options.classement){
+        const salleCapacite = result.reduce((acc, cur) =>{
+            const salle = cur.salle;
+            const capacite = cur.capacitaire;
+            if(!acc.has(salle) || acc.get(salle) < capacite){
+                acc.set(salle, capacite);
+            }
+            return acc;
+        }, new Map());
+        const salleCapaciteArray = Array.from(salleCapacite, ([salle, capacite]) => ({ salle, capacite }));
+        salleCapaciteArray.sort((a, b) => b.capacite - a.capacite);
+        console.log("Classement des salles selon leur capacite maximale :");
+        for (const { salle, capacite } of salleCapaciteArray) {
+            console.log(`${salle}: ${capacite}`);
+        }
+        
+    }
+//process.exit(0);
 
 
