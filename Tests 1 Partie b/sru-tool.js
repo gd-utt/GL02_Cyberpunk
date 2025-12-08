@@ -294,7 +294,7 @@ if (options.verif){
         
     }
 
-    if (options.verif) {
+   /* if (options.verif) {
         let errors = [];
         for (let x = 0; x < result.length; x++) {
             for (let y = x + 1; y < result.length; y++) {
@@ -318,47 +318,79 @@ if (options.verif){
         }
 
         return errors;
+    }*/
+
+if (options.iCalendar) {
+
+    const course = options.iCalendar;     // nom du cours
+    const dateDebut = program.args[1];    // date début
+    const dateFin   = program.args[2];    // date fin
+
+    if (!dateDebut || !dateFin) {
+        console.log("Format attendu :");
+        console.log("node sru-tool.js fichier.cru -ical GL02 2025-02-10 2025-05-20");
+        process.exit(0);
     }
 
-    if (options.ical){
+    // Filtrer les cours
+    const filtered = result.filter(e =>
+        e.matiere.toUpperCase() === course.toUpperCase()
+    );
 
-        const filtered = result.filter(e => e.matiere.toUpperCase() === options.course.toUpperCase());
+    if (filtered.length === 0) {
+        console.log("Aucun créneau trouvé pour ce cours.");
+        process.exit(0);
+    }
 
-        if (filtered.length === 0) {
-            console.log("Aucune séance trouvée pour ce cours.");
-            return;
+    function toICS(h) {
+        const parts = h.split("=");
+        const hm = parts[1].split(":");
+        const HH = hm[0];
+        const MM = hm[1];
+        return HH + MM + "00";
+    }
+
+    function twoDigits(n) {
+        if (n < 10) {
+            return "0" + n;
+        } else {
+            return "" + n;
         }
+    }
 
-        let ics = "BEGIN:VCALENDAR\nVERSION:2.0\n";
-
-        for (let e of filtered) {
-
-            const d0 = dateOfFirstWeekday(startDate, e.jour);
-            const yyyy = d0.getFullYear();
-            const mm = String(d0.getMonth() + 1).padStart(2,"0");
-            const dd = String(d0.getDate()).padStart(2,"0");
-
-            const DTSTART = `${yyyy}${mm}${dd}T${toHour(e.h1).replace("Z","")}`;
-            const DTEND  = `${yyyy}${mm}${dd}T${toHour(e.h2).replace("Z","")}`;
-
-            ics += "BEGIN:VEVENT\n";
-            ics += `DTSTART:${DTSTART}\n`;
-            ics += `DTEND:${DTEND}\n`;
-            ics += `SUMMARY:${course}\n`;
-            ics += `LOCATION:${e.salle}\n`;
-            ics += `RRULE:FREQ=WEEKLY;UNTIL=${endDate.replace(/-/g,"")}T235900Z\n`;
-            ics += "END:VEVENT\n";
+    function getFirstDate(startDate, jourCRU) {
+        const mapJour = { L: 1, MA: 2, ME: 3, J: 4, V: 5 };
+        const targetDay = mapJour[jourCRU];
+        let d = new Date(startDate);
+        while (d.getDay() !== targetDay) {
+            d.setDate(d.getDate() + 1);
         }
+        return d;
+    }
 
-        ics += "END:VCALENDAR";
-
-        fs.writeFileSync(`${course}.ics`, ics, "utf-8");
-        console.log(`Fichier ${course}.ics généré !`);
-
-
+    let ics = "BEGIN:VCALENDAR\nVERSION:2.0\n";
+    for (let e of filtered) {
+        const first = getFirstDate(dateDebut, e.jour);
+        const yyyy = first.getFullYear();
+        const mm   = twoDigits(first.getMonth() + 1);
+        const dd   = twoDigits(first.getDate());
+        const DTSTART = `${yyyy}${mm}${dd}T${toICS(e.h1)}`;
+        const DTEND   = `${yyyy}${mm}${dd}T${toICS(e.h2)}`;
+        const UNTIL   = dateFin.replace(/-/g, "") + "T235959Z";
+        ics += "BEGIN:VEVENT\n";
+        ics += `SUMMARY:${course}\n`;
+        ics += `LOCATION:${e.salle}\n`;
+        ics += `DTSTART:${DTSTART}\n`;
+        ics += `DTEND:${DTEND}\n`;
+        ics += `RRULE:FREQ=WEEKLY;UNTIL=${UNTIL}\n`;
+        ics += "END:VEVENT\n";
+    }
+    ics += "END:VCALENDAR";
+    fs.writeFileSync(`${course}.ics`, ics, "utf8");
+    console.log(`Fichier iCalendar : ${course}.ics`);
+    process.exit(0);
 }
 
 process.exit(0);
-//process.exit(0);
 
 
