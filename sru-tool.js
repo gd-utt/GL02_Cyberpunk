@@ -322,17 +322,15 @@ if (options.verif){
 
 if (options.iCalendar) {
 
-    const course = options.iCalendar;     // nom du cours
-    const dateDebut = program.args[1];    // date début
-    const dateFin   = program.args[2];    // date fin
-
+    const course = options.iCalendar;
+    const dateDebut = program.args[1];
+    const dateFin   = program.args[2];
     if (!dateDebut || !dateFin) {
         console.log("Format attendu :");
-        console.log("node sru-tool.js fichier.cru -ical GL02 2025-02-10 2025-05-20");
+        console.log("node sru-tool.js fichier.cru --iCalendar GL02 2025-02-10 2025-05-20");
         process.exit(0);
     }
 
-    // Filtrer les cours
     const filtered = result.filter(e =>
         e.matiere.toUpperCase() === course.toUpperCase()
     );
@@ -343,8 +341,12 @@ if (options.iCalendar) {
     }
 
     function toICS(h) {
-        const parts = h.split("=");
-        const hm = parts[1].split(":");
+        let heure = h;
+        if (heure.includes("=")) {
+            const parts = heure.split("=");
+            heure = parts[1];
+        }
+        const hm = heure.split(":");
         const HH = hm[0];
         const MM = hm[1];
         return HH + MM + "00";
@@ -390,6 +392,7 @@ if (options.iCalendar) {
     console.log(`Fichier iCalendar : ${course}.ics`);
     process.exit(0);
 }
+
 
 process.exit(0);
 
