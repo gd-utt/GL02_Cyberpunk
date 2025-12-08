@@ -82,7 +82,7 @@ Génère un fichier .ics (iCalendar) contenant tous les créneaux du cours
 indiqué, répétés chaque semaine entre les deux dates.
 Exemple :
 ```bash
-node sru-tool.js -ical GL02 2025-02-10 2025-05-20 emploi.cru
+node sru-tool.js emploi.cru -ical GL02 2025-02-10 2025-05-20 emploi.cru
 ```
 
 **Installation (Si nécessaire)**
