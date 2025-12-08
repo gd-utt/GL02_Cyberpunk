@@ -15,6 +15,7 @@ program
     .option("-v, --verif", "Verifie si le cru est coherent dans les planning")
     .option("-g, --genererSynthetic", "Donne un visuel synthetic de l'usage de chaque classe")
     .option("-cl, --classement", "Classe les salles selon leur capacite maximale")
+    .option("-ical, --iCalendar <course> <date_debut> <date_fin>", "Générer un fichier iCalendar (RFC 5545) entre deux dates données pour un enseignement")
     .parse(process.argv);
 
 const options = program.opts();
@@ -145,7 +146,8 @@ if (options.capaciteMax) {
     if (result.length === 0) {
         console.log("La salle n'a pas ete trouvee ");
         process.exit(0);
-    }else{
+    }
+    else{
         const capMax = result.reduce((max, sCap) => {
             const valSalle = sCap['capacitaire'];
             return Math.max(max, valSalle);
@@ -196,48 +198,7 @@ if (options.salleCreneau) {
     }
 }
 
-
-
-
-
-
-
-    /*if (options.salleCreneau){
-    result = result.filter(e => (e.matiere.toUpperCase() === "LIBRE"));
-    if(result.length === 0){
-         console.log("Aucune salle n'est libre");
-    }else{
-        const creneau = options.salleCreneau.split("/");
-        const try1 = result.filter(e => (e.h1 === "H="+creneau[1] && e.h2 === creneau[2] && e.jour === creneau[0]));
-        if(try1.length === 0){
-            const try2 = result.filter(e => (e.h1 === "H="+creneau[1]));
-            const try3 = result.filter(e => (e.h2 === "H="+creneau[2]));
-
-            if(try2.length === 0 && try3.length === 0) {
-                console.log("Le creneau donnee n'a aucune corexpondance");
-            }
-            else if (try3.length === 0 && try2.length !== 0){
-
-            } else{
-                console.log("Le creneau n'a pas correspondance mais des horaires sont utilisables");
-                for (let e of try2) {
-                    console.log(
-                        `${e.salle} | ${e.jour} ${e.h1} jusqu'a ${e.h2} | Cap=${e.capacitaire}`
-                    );
-                }
-            }
-        }else{
-            console.log("Les salles libres sont : ");
-            for (let e of try1) {
-                console.log(
-                    `${e.salle} | ${e.jour} ${e.h1}-${e.h2} | Cap=${e.capacitaire}`
-                );
-            }
-        }
-    }
-}
-*/
-    if(options.verif){
+if (options.verif){
         classeur(result);
         let i = 0;
         let conflictCount =0;
@@ -332,6 +293,72 @@ if (options.salleCreneau) {
         }
         
     }
+
+    if (options.verif) {
+        let errors = [];
+        for (let x = 0; x < result.length; x++) {
+            for (let y = x + 1; y < result.length; y++) {
+
+                const i = result[x];
+                const j = result[y];
+
+                if (i.salle === j.salle && i.jour === j.jour) {
+
+                    if (toNumber(j.h1) < toNumber(i.h2) &&
+                        toNumber(i.h1) < toNumber(j.h2)) {
+
+                        errors.push(
+                            `Conflit dans la salle ${i.salle} (${i.jour}) : ` +
+                            `${i.matiere} ${i.h1}-${i.h2} chevauche ` +
+                            `${j.matiere} ${j.h1}-${j.h2}`
+                        );
+                    }
+                }
+            }
+        }
+
+        return errors;
+    }
+
+    if (options.ical){
+
+        const filtered = result.filter(e => e.matiere.toUpperCase() === options.course.toUpperCase());
+
+        if (filtered.length === 0) {
+            console.log("Aucune séance trouvée pour ce cours.");
+            return;
+        }
+
+        let ics = "BEGIN:VCALENDAR\nVERSION:2.0\n";
+
+        for (let e of filtered) {
+
+            const d0 = dateOfFirstWeekday(startDate, e.jour);
+            const yyyy = d0.getFullYear();
+            const mm = String(d0.getMonth() + 1).padStart(2,"0");
+            const dd = String(d0.getDate()).padStart(2,"0");
+
+            const DTSTART = `${yyyy}${mm}${dd}T${toHour(e.h1).replace("Z","")}`;
+            const DTEND  = `${yyyy}${mm}${dd}T${toHour(e.h2).replace("Z","")}`;
+
+            ics += "BEGIN:VEVENT\n";
+            ics += `DTSTART:${DTSTART}\n`;
+            ics += `DTEND:${DTEND}\n`;
+            ics += `SUMMARY:${course}\n`;
+            ics += `LOCATION:${e.salle}\n`;
+            ics += `RRULE:FREQ=WEEKLY;UNTIL=${endDate.replace(/-/g,"")}T235900Z\n`;
+            ics += "END:VEVENT\n";
+        }
+
+        ics += "END:VCALENDAR";
+
+        fs.writeFileSync(`${course}.ics`, ics, "utf-8");
+        console.log(`Fichier ${course}.ics généré !`);
+
+
+}
+
+process.exit(0);
 //process.exit(0);
 
 
