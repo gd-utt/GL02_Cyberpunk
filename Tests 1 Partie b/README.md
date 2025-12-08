@@ -1,49 +1,64 @@
-# SRU-Tool — Gestion des salles (CLI) — Node.js
+# SRU-Tool
 
-Outil en ligne de commande pour consulter / analyser / exporter des emplois du temps au format CRU.
+SRU-Tool est un petit programme en ligne de commande permettant de lire et analyser
+des fichiers .cru (emplois du temps).  
+Il propose plusieurs fonctionnalités : recherche de salles, vérification du planning,
+classement des salles, génération d’un fichier iCalendar, etc.
 
-## Prérequis
-- Node.js >= 16
-- Git (pour GitLab)
+## Utilisation
 
-## Installation
-```bash
-git clone <url_repo>
-cd sru-tool
-npm install
+    node sru-tool.js <fichier.cru> [options]
 
-##Aide 
-node sru-tool.js --help
-# ou après `npm install -g .` :
-# sru-tool --help
+## Options
 
-##Exemple
+--cours <type>  
+Affiche les salles utilisées par un CM, TD ou TP (ex : --cours CM).
 
-Rechercher les salles d’un cours :
-node sru-tool.js --cours GL02 sample.cru
+--salle <nom>  
+Affiche les créneaux où une salle est libre.
 
-Capacité d’une salle :
-node sru-tool.js -c C006 sample.cru
+--salleCreneau <jour/hdeb/hfin>  
+Affiche les salles libres pendant un créneau donné.
+Exemple : --salleCreneau L/10:00/12:00
 
-Disponibilités d'une salle (fenêtre 08:00-20:00) :
-node sru-tool.js -s C006 sample.cru
+--capaciteMax <salle>  
+Affiche la capacité maximale d’une salle.
 
-Salles disponibles pour un créneau (ex: "L H=09:00-11:00"):
-node sru-tool.js --salleCreneau "L H=09:00-11:00" sample.cru
+--verif  
+Vérifie la cohérence du fichier .cru : heures invalides, chevauchements
+dans une même salle, etc.
 
-Vérifier chevauchements :
-node sru-tool.js -v sample.cru
+--genererSynthetic  
+Produit un fichier CSV et un graphique PNG donnant le taux d'utilisation
+de chaque salle.
 
-Générer .ics pour un cours entre deux dates :
-node sru-tool.js --ical GL02 2025-10-01 2025-12-31 sample.cru
+--classement  
+Affiche les salles triées par capacité maximale.
 
-Générer CSV taux d'occupation :
-node sru-tool.js -g sample.cru
-# output -> data/occupation.csv
+--iCalendar <course> <date_debut> <date_fin>
+Génère un fichier .ics (iCalendar) contenant tous les créneaux du cours
+indiqué, répétés chaque semaine entre les deux dates.
+Exemple :
+node sru-tool.js emploi.cru -ical GL02 2025-02-10 2025-05-20
 
-Classer salles par capacité :
-node sru-tool.js --rank-capacity sample.cru
+## Format du fichier .cru
 
-##Tests unitaires
+Le fichier est organisé par matières, annoncées par :
 
-npm test
+    +GL02
+
+Puis chaque cours est une ligne du type :
+
+    1,CM,P=30,H=L H=08:00-10:00,1,C006
+- type : CM / TD / TP
+- capacité 
+- jour 
+- horaires : début et fin
+- salle
+
+Un exemple de CRU est donné dans le fichier sample.cru
+
+## Auteurs
+Projet réalisé par APEAPEA MIGUE Yves, KHIAT Magdalena et LACOUR Doniphan
+dans le cadre d'un projet du cours de GL02 à l'UTT.
+
