@@ -9,8 +9,21 @@ classement des salles, génération d’un fichier iCalendar, etc.
 
     node sru-tool.js <fichier.cru> [options]
 
-## Options
+## Prérequis
+- Node.js >= 16
+- Git (pour GitLab)
 
+## Installation
+git clone <url_repo>
+cd sru-tool
+npm install
+
+## Aide 
+node sru-tool.js --help
+# ou après `npm install -g .` :
+# sru-tool --help
+
+## Options
 --cours <type>  
 Affiche les salles utilisées par un CM, TD ou TP (ex : --cours CM).
 
@@ -57,6 +70,10 @@ Puis chaque cours est une ligne du type :
 - salle
 
 Un exemple de CRU est donné dans le fichier sample.cru
+
+## Tests unitaires
+
+npm test
 
 ## Auteurs
 Projet réalisé par APEAPEA MIGUE Yves, KHIAT Magdalena et LACOUR Doniphan
