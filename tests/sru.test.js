@@ -11,30 +11,23 @@ const TEST_OUTPUT_ICS = 'GL02.ics';
 const TEST_OUTPUT_CSV = './fiche_synthetic_'; // Doit gérer le nom dynamique
 
 /**
- * Exécute le script sru-tool.js avec les arguments donnés et retourne la sortie standard.
+ * Exécute sru-tool.js avec les arguments spécifiés et retourne la sortie console.
  * @param {string} args - Les arguments à passer à sru-tool.js (ex: "-v").
  * @returns {string} La sortie console (stdout).
  */
 function runSruTool(args) {
-    // La commande à exécuter : node /chemin/vers/sru-tool.js /chemin/vers/sample.cru [args]
     const command = `node ${SRU_TOOL} ${SAMPLE_CRU} ${args}`;
-    
-    // execSync exécute la commande et retourne le stdout
-    // Note: Utiliser try/catch pour gérer les erreurs et les codes de sortie non nuls
     try {
         const stdout = execSync(command, { encoding: 'utf8' });
         return stdout.trim();
     } catch (error) {
-        // En cas d'erreur CLI, retourner stderr pour l'assertion
         return error.stderr.trim(); 
     }
 }
 
-// Nettoyage des fichiers générés
 afterAll(() => {
     try {
         if (fs.existsSync(TEST_OUTPUT_ICS)) fs.unlinkSync(TEST_OUTPUT_ICS);
-        // Nettoyage des fichiers CSV et PNG générés dynamiquement par -g
         const currentMonth = new Date().getMonth() + 1;
         const currentYear = new Date().getFullYear();
         const csvPath = path.join(__dirname, '..', `${TEST_OUTPUT_CSV}${currentMonth}_${currentYear}.csv`);
@@ -64,7 +57,7 @@ describe('Test en mode CLI (sru-tool.js)', () => {
         expect(output).toContain("Salle C006 | L H=08:00-10:00 | GL02");
         expect(output).toContain("Salle C007 | MA H=09:00-11:00 | GL02");
         expect(output).toContain("Salle C010 | MA H=09:00-11:00 | GL03");
-        expect(output).not.toContain("TP"); // Vérifie qu'il ne liste pas les TP
+        expect(output).not.toContain("TP");
     });
 
     test('Option --capaciteMax C006 (-c) doit retourner 30', () => {
@@ -81,22 +74,19 @@ describe('Test en mode CLI (sru-tool.js)', () => {
     test('Option --classement (-cl) doit commencer par C007 (40)', () => {
         const output = runSruTool('-cl');
         const lines = output.split('\n');
-        // Le premier élément du classement doit être C007: 40
         expect(lines[1]).toContain("C007: 40"); 
     });
 
     test('Option --genererSynthetic (-g) doit créer les fichiers CSV et PNG', () => {
         const output = runSruTool('-g');
-        expect(output).toContain("Fiche synthetic generee : "); // Vérifie le message de succès
+        expect(output).toContain("Fiche synthetic generee : "); 
         
-        // Vérifie la présence des fichiers générés dynamiquement
         const currentMonth = new Date().getMonth() + 1;
         const currentYear = new Date().getFullYear();
         const csvPath = path.join(__dirname, '..', `${TEST_OUTPUT_CSV}${currentMonth}_${currentYear}.csv`);
         const pngPath = path.join(__dirname, '..', `${TEST_OUTPUT_CSV}${currentMonth}_${currentYear}.png`);
         
         expect(fs.existsSync(csvPath)).toBe(true);
-        // On suppose que Vegashop a bien généré le PNG 
     });
 
     test('Option --iCalendar doit créer le fichier GL02.ics', () => {
@@ -108,6 +98,6 @@ describe('Test en mode CLI (sru-tool.js)', () => {
         
         const icsContent = fs.readFileSync(TEST_OUTPUT_ICS, 'utf8');
         expect(icsContent).toContain('BEGIN:VCALENDAR');
-        expect((icsContent.match(/BEGIN:VEVENT/g) || []).length).toBe(6); // 3 semaines * 2 événements par semaine
+        expect((icsContent.match(/BEGIN:VEVENT/g) || []).length).toBe(6);
     });
 });
