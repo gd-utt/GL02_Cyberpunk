@@ -4,7 +4,7 @@
 Projet réalisé par **KHIAT Magdalena**, **LACOUR Doniphan** et **APEAPEA MIGUE Yves** dans le cadre de l'unité d'enseignement GL02 à l'UTT (Université de Technologie de Troyes).
 
 ## Licence
-Ce projet est distribué sous une licence **Open Source**.
+Ce projet est sous la licence MIT, voir le fichier de licence pour plus de détails.
 
 ## Description : Software aims and principles
 **SRU-Tool** est un utilitaire en ligne de commande (CLI) conçu pour faciliter la gestion et l'analyse des emplois du temps au format **.cru**.
