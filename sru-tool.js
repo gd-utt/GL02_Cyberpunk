@@ -104,14 +104,14 @@ function optimusPrime(table, enTete){
 
 /* ------------------ PHOTOSHOP ------------------ */
 async function Vegashop(vegaprint, cheminFichePng) {
-    const { compile } = await import("vega-lite"); 
-    const { View, parse } = await import("vega"); 
+    const { compile } = await import("vega-lite");
+    const vega = await import("vega");
+    const canvas = await import("canvas");
     const vegaSpec = compile(vegaprint).spec;
-    const view = new View(parse(vegaSpec), { 
-        renderer: "canvas" 
-    }).finalize();
-    const canvas = await view.toCanvas();
-    const buffer = canvas.toBuffer("image/png");
+    const view = new vega.View(vega.parse(vegaSpec),{renderer: "none"});
+    await view.runAsync();
+    const canvasResult = await view.toCanvas(1, { type: "png", context: { canvas: canvas.createCanvas } });
+    const buffer = canvasResult.toBuffer("image/png");
     fs.writeFileSync(cheminFichePng, buffer);
 }
 
@@ -272,8 +272,14 @@ if (options.verif){
             }
         };
         const cheminFichePng = `./fiche_synthetic_${instant.getMonth() + 1}_${instant.getFullYear()}.png`;
-        Vegashop(vegaprint, cheminFichePng);
-        console.log(`Fiche synthetic generee : ${cheminFicheCSV}`);
+        Vegashop(vegaprint, cheminFichePng).then(() => {
+            console.log(`Fiche synthetic generee : ${cheminFicheCSV}, ${cheminFichePng}`);
+            process.exit(0);
+        }).catch(err => {
+            console.error("Erreur lors de la generation du PNG:", err);
+            process.exit(1);
+        });
+        return;
     }
 
     if(options.classement){
