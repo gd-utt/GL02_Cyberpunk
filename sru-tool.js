@@ -29,8 +29,11 @@ function parseCRU(path) {
 
     let currentMatiere = null;
     let entries = [];
+	let errors = [];
+	let lineNb = 0;
 
     for (let raw of lines) {
+		lineNb++;
         const line = raw.trim();
         if (!line) continue;
 
@@ -42,20 +45,79 @@ function parseCRU(path) {
 
         // Ligne de cours
         if (line.startsWith("1,")) {
-            const clean = line.replace(/\/\/$/, "");
+			if (currentMatiere == null) {
+				console.log("Erreur, fichier CRU invalide ! Ligne de cours avant d'avoir définit la 'matière'.");
+				errors.push({"type": "Ligne de cours avant définition de la matière", "ligne": 1});
+				// On ne 'continue;' pas, l'erreur n'entraîne pas d'exception plus tard
+			}
+            const clean = line.replace(/\/\/$/, ""); // Retire les "//" en fin de ligne
+			if (clean == line) {
+				console.log("Erreur, fichier CRU invalide ! La ligne " + lineNb + " ne se termine pas correctement. Ligne invalide : ");
+				console.log(raw);
+				errors.push({"type": "Terminaison de ligne de cours invalide", "ligne": lineNb});
+				continue;
+			}
 
             // structure : 1,CM,P=30,H=L H=08:00-10:00,1,C006
             const parts = clean.split(",");
+			if (parts.length != 6) {
+				console.log("Erreur, fichier CRU invalide ! La ligne " + lineNb + " ne contient pas le nombre de champs attendu. Ligne invalide : ");
+				console.log(raw);
+				errors.push({"type": "Nombre de champs incorrect dans une ligne de cours", "ligne": lineNb});
+				continue;
+			}
 
             const type = parts[1].trim();           // CM
             const capacitaire = Number(parts[2].split("=")[1]);
+			if (capacitaire == NaN) {
+				console.log("Erreur, fichier CRU invalide ! Le capacitaire de la ligne " + lineNb + " est invalide. Ligne invalide : ");
+				console.log(raw);
+				errors.push({"type": "Capacitaire n'est pas un nombre valide", "ligne": lineNb});
+				continue;
+			}
 
             // H=L H=08:00-10:00
-            const h = parts[3].substring(2).trim().split(" ");
-            const jour = h[0];                     // L
-            const heures = h[1].split("-");
+            const horaire = parts[3].substring(2).trim().split(" ");
+			if (horaire.length != 2) {
+				console.log("Erreur, fichier CRU invalide ! L'horaire de la ligne " + lineNb + " est invalide. Ligne invalide : ");
+				console.log(raw);
+				errors.push({"type": "Horaire invalide", "ligne": lineNb});
+				continue;
+			}
+            const jour = horaire[0];               // L
+            const heures = horaire[1].substring(2).split("-");
+			if (heures.length != 2) {
+				console.log("Erreur, fichier CRU invalide ! Les heures de l'horaire de la ligne " + lineNb + " sont invalides. Ligne invalide : ");
+				console.log(raw);
+				errors.push({"type": "Horaire invalide : nombre d'heure incorrect", "ligne": lineNb});
+				continue;				
+			}
             const h1 = heures[0];                  // 08:00
             const h2 = heures[1];                  // 10:00
+			
+			const h1verif = h1.split(":");
+			const h2verif = h2.split(":");
+			if (heures.length != 2) {
+				console.log("Erreur, fichier CRU invalide ! Les heures de l'horaire de la ligne " + lineNb + " sont invalides. Ligne invalide : ");
+				console.log(raw);
+				errors.push({"type": "Horaire invalide : les heures sont incorrectes", "ligne": lineNb});
+				continue;
+			}
+			h1h = Number(h1verif[0]);
+			h1m = Number(h1verif[1]);
+			h2h = Number(h2verif[0]);
+			h2m = Number(h2verif[1]);
+			if (h1h < 0 || h1h > 23 || h1m < 0 || h1m > 59) {
+				console.log("Erreur, fichier CRU invalide ! La première heure de l'horaire de la ligne " + lineNb + " est invalide. Ligne invalide : ");
+				console.log(raw);
+				errors.push({"type": "Horaire invalide : les heures sont incorrectes : première heure", "ligne": lineNb});
+				continue;
+			} else if (h2h < 0 || h2h > 23 || h2m < 0 || h2m > 59) {
+				console.log("Erreur, fichier CRU invalide ! La deuxième heure de l'horaire de la ligne " + lineNb + " est invalide. Ligne invalide : ");
+				console.log(raw);
+				errors.push({"type": "Horaire invalide : les heures sont incorrectes : deuxième heure", "ligne": lineNb});
+				continue;
+			}
 
             const salle = parts[5].trim();         // C006
 
@@ -68,8 +130,19 @@ function parseCRU(path) {
                 h2,
                 salle
             });
+			
+			continue;
         }
+		
+		// Si la ligne n'est pas vide et que l'on ne la reconnaît pas alors erreur
+		console.log("Erreur, fichier CRU invalide ! La ligne " + lineNb + " n'est pas reconnu. Ligne invalide : ");
+		console.log(raw);
+		errors.push({"type": "Ligne non-vide pas reconnu", "ligne": lineNb});		
     }
+
+	if (errors.length > 0) {
+		return; // Renvoie undefined
+	}
 
     return entries;
 }
@@ -91,7 +164,7 @@ function classeur(table){
 /* ------------------ CHIFFREUR ------------------ */
 function toNumber(horaire) {
             return parseInt(horaire.replace(/\D/g, ""));
-        }
+}
 
 /* ------------------ TRANSFORMERS ------------------ */
 function optimusPrime(table, enTete){
@@ -118,6 +191,11 @@ async function Vegashop(vegaprint, cheminFichePng) {
 /* ------------------ EXECUTION ------------------ */
 
 const data = parseCRU(cruFile);
+
+if (data == undefined) {
+	console.log("Il y a eu des erreurs durant le traitement du fichier, l'action demandée ne sera pas effectuée. Arrêt du script...");
+	return;
+}
 
 // Filtrage
 let result = data;
