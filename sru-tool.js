@@ -276,133 +276,139 @@ if (options.salleCreneau) {
     }
 }
 
-if (options.verif){
-        classeur(result);
-        let i = 0;
-        let conflictCount =0;
-        for(let e of result){
-            if(toNumber(e.h1) >= toNumber(e.h2)){
-                conflictCount++;
-                console.log(`Horaire invalide pour ${mat2} le ${e.jour}`);
+if (options.verif) {
+    classeur(result); // On TRIE tous les cours
+    let i = 0;
+    let conflictCount = 0;
+    for (let e of result) {
+        if (toNumber(e.h1) >= toNumber(e.h2)) {
+            conflictCount++;
+            console.log(`Horaire invalide pour ${e.matiere} le ${e.jour}`);
+        }
+		
+        for (let j = 0; j < result.length; j++) {
+            if (i <= j) {
+                continue;
             }
-            for(let j = 0; j < result.length; j++){
-                if(i <= j){
-                    continue;
-                }
-                if(e.jour == result[j].jour){
-                    if(e.salle === result[j].salle){
-                        if((toNumber(e.h1) >= toNumber(result[j].h1)) && (toNumber(e.h1) < toNumber(result[j].h2)) && (toNumber(e.h2) <= toNumber(result[j].h2) || toNumber(e.h2) >= toNumber(result[j].h2) ) ){
-                            conflictCount++;
-                            let mat1;
-                            let mat2;
-                            if(e.matiere.toUpperCase() == "LIBRE"){
-                                mat1 = "'Horaire libre'";
-                            }else{
-                                mat1 = e.matiere;
-                            }
-                            if(result[j].matiere.toUpperCase() == "LIBRE"){
-                                mat2 = "'Horaire libre'";
-                            }else{
-                                mat2 = result[j].matiere;
-                            }
-                            console.log(`Conflict de programme entre ${mat1}(${e.type}) et ${mat2}(${result[j].type}) le ${e.jour} ${e.h1}-${e.h2} `);
+            if (e.jour == result[j].jour) {
+                if (e.salle === result[j].salle) {
+                    if (
+                        (toNumber(e.h1) >= toNumber(result[j].h1) &&
+                            toNumber(e.h1) < toNumber(result[j].h2)) ||
+                        (toNumber(e.h2) > toNumber(result[j].h1) &&
+                            toNumber(e.h2) <= toNumber(result[j].h2)) ||
+						(toNumber(e.h1) <= toNumber(result[j].h1) &&
+						toNumber(e.h2) >= toNumber(result[j].h2))
+                    ) {
+                        conflictCount++;
+                        let mat1;
+                        let mat2;
+                        if (e.matiere.toUpperCase() == "LIBRE") {
+                            mat1 = "'Horaire libre'";
+                        } else {
+                            mat1 = e.matiere;
                         }
-                    }
-                }else{
-                    continue;
-                } 
-            }
-            i++;
-        }
-        if(conflictCount == 0){
-                console.log("Le fichier est correct");
-        }else{
-                console.log("Nombre total de conflict rencontre : " + conflictCount);
-        }
-    }
-
-    if(options.genererSynthetic){
-        const nbr = result.length;
-        const salleUseCount = result.reduce((acc, cur) =>{
-            const salle = cur.salle;
-            acc.set(salle, (acc.get(salle) || 0)+1);
-            return acc;
-        }, new Map());
-        const salleUseTaux = new Map();
-        for([salle, count] of salleUseCount){
-            const taux = (count/nbr)*100;
-            salleUseTaux.set(salle, taux.toFixed(2));
-        }
-        const enTete = ["Salle", "Taux"];
-        const contenuCSV = optimusPrime(Array.from(salleUseTaux),enTete);
-        const instant = new Date();
-        const cheminFicheCSV = `./fiche_synthetic_${instant.getMonth() + 1}_${instant.getFullYear()}.csv`;
-        fs.writeFileSync(cheminFicheCSV, contenuCSV, "utf8");
-        const vegaprint ={
-            $schema: "https://vega.github.io/schema/vega-lite/v5.json",
-            description: "Usage des salles",
-            data: { url: cheminFicheCSV },
-            mark: "bar",
-            encoding: {
-                y: {field:"Salle", type:"nominal"},
-                x: {field:"Taux", type:"quantitative"},
-                color: {field:"Salle", type:"nominal"}
-            }
-        };
-        const cheminFichePng = `./fiche_synthetic_${instant.getMonth() + 1}_${instant.getFullYear()}.png`;
-        Vegashop(vegaprint, cheminFichePng).then(() => {
-            console.log(`Fiche synthetic generee : ${cheminFicheCSV}, ${cheminFichePng}`);
-            process.exit(0);
-        }).catch(err => {
-            console.error("Erreur lors de la generation du PNG:", err);
-            process.exit(1);
-        });
-        return;
-    }
-
-    if(options.classement){
-        const salleCapacite = result.reduce((acc, cur) =>{
-            const salle = cur.salle;
-            const capacite = cur.capacitaire;
-            if(!acc.has(salle) || acc.get(salle) < capacite){
-                acc.set(salle, capacite);
-            }
-            return acc;
-        }, new Map());
-        const salleCapaciteArray = Array.from(salleCapacite, ([salle, capacite]) => ({ salle, capacite }));
-        salleCapaciteArray.sort((a, b) => b.capacite - a.capacite);
-        console.log("Classement des salles selon leur capacite maximale :");
-        for (const { salle, capacite } of salleCapaciteArray) {
-            console.log(`${salle}: ${capacite}`);
-        }
-        
-    }
-
-   /* if (options.verif) {
-        let errors = [];
-        for (let x = 0; x < result.length; x++) {
-            for (let y = x + 1; y < result.length; y++) {
-
-                const i = result[x];
-                const j = result[y];
-
-                if (i.salle === j.salle && i.jour === j.jour) {
-
-                    if (toNumber(j.h1) < toNumber(i.h2) &&
-                        toNumber(i.h1) < toNumber(j.h2)) {
-
-                        errors.push(
-                            `Conflit dans la salle ${i.salle} (${i.jour}) : ` +
-                            `${i.matiere} ${i.h1}-${i.h2} chevauche ` +
-                            `${j.matiere} ${j.h1}-${j.h2}`
-                        );
+                        if (result[j].matiere.toUpperCase() == "LIBRE") {
+                            mat2 = "'Horaire libre'";
+                        } else {
+                            mat2 = result[j].matiere;
+                        }
+                        console.log(`Conflict de programme le ${e.jour} entre ${mat1} (${e.type} à ${e.h1}-${e.h2}) et ${mat2} (${result[j].type} à ${result[j].h1}-${result[j].h2}) en salle ${e.salle}`);
                     }
                 }
             }
         }
+        i++;
+    }
+    if (conflictCount == 0) {
+        console.log("Le fichier ne contient pas de conflit");
+    } else {
+        console.log("Nombre total de conflict rencontre : " + conflictCount);
+    }
+}
 
-        return errors;
-    }*/
+if (options.genererSynthetic){
+    const nbr = result.length;
+    const salleUseCount = result.reduce((acc, cur) =>{
+        const salle = cur.salle;
+        acc.set(salle, (acc.get(salle) || 0)+1);
+        return acc;
+    }, new Map());
+    const salleUseTaux = new Map();
+    for([salle, count] of salleUseCount){
+        const taux = (count/nbr)*100;
+        salleUseTaux.set(salle, taux.toFixed(2));
+    }
+    const enTete = ["Salle", "Taux"];
+    const contenuCSV = optimusPrime(Array.from(salleUseTaux),enTete);
+    const instant = new Date();
+    const cheminFicheCSV = `./fiche_synthetic_${instant.getMonth() + 1}_${instant.getFullYear()}.csv`;
+    fs.writeFileSync(cheminFicheCSV, contenuCSV, "utf8");
+    const vegaprint ={
+        $schema: "https://vega.github.io/schema/vega-lite/v5.json",
+        description: "Usage des salles",
+        data: { url: cheminFicheCSV },
+        mark: "bar",
+        encoding: {
+            y: {field:"Salle", type:"nominal"},
+            x: {field:"Taux", type:"quantitative"},
+            color: {field:"Salle", type:"nominal"}
+        }
+    };
+    const cheminFichePng = `./fiche_synthetic_${instant.getMonth() + 1}_${instant.getFullYear()}.png`;
+    Vegashop(vegaprint, cheminFichePng).then(() => {
+        console.log(`Fiche synthetic generee : ${cheminFicheCSV}, ${cheminFichePng}`);
+        process.exit(0);
+    }).catch(err => {
+        console.error("Erreur lors de la generation du PNG:", err);
+        process.exit(1);
+    });
+    return;
+}
+
+if (options.classement){
+    const salleCapacite = result.reduce((acc, cur) =>{
+        const salle = cur.salle;
+        const capacite = cur.capacitaire;
+        if(!acc.has(salle) || acc.get(salle) < capacite){
+            acc.set(salle, capacite);
+        }
+        return acc;
+    }, new Map());
+    const salleCapaciteArray = Array.from(salleCapacite, ([salle, capacite]) => ({ salle, capacite }));
+    salleCapaciteArray.sort((a, b) => b.capacite - a.capacite);
+    console.log("Classement des salles selon leur capacite maximale :");
+    for (const { salle, capacite } of salleCapaciteArray) {
+        console.log(`${salle}: ${capacite}`);
+    }
+    
+}
+
+/* if (options.verif) {
+    let errors = [];
+    for (let x = 0; x < result.length; x++) {
+        for (let y = x + 1; y < result.length; y++) {
+
+            const i = result[x];
+            const j = result[y];
+
+            if (i.salle === j.salle && i.jour === j.jour) {
+
+                if (toNumber(j.h1) < toNumber(i.h2) &&
+                    toNumber(i.h1) < toNumber(j.h2)) {
+
+                    errors.push(
+                        `Conflit dans la salle ${i.salle} (${i.jour}) : ` +
+                        `${i.matiere} ${i.h1}-${i.h2} chevauche ` +
+                        `${j.matiere} ${j.h1}-${j.h2}`
+                    );
+                }
+            }
+        }
+    }
+
+    return errors;
+}*/
 
 if (options.iCalendar) {
 
