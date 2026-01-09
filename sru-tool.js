@@ -231,7 +231,7 @@ if (options.verif){
                         }
                     }
                 }else{
-                    break;
+                    continue;
                 } 
             }
             i++;
